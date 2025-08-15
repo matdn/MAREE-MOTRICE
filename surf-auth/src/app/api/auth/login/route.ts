@@ -7,29 +7,48 @@ import { getIronSession } from "iron-session";
 import { SessionData, sessionOptions } from "../../../../../lib/session";
 import { prisma } from "../../../../../lib/prisma";
 
-
-
-const Schema = z.object({ email: z.string().email(), password: z.string().min(6) });
+const Schema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+});
 
 export async function POST(req: Request) {
     try {
         const json = await req.json().catch(() => null);
         const parsed = Schema.safeParse(json);
-        if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+        if (!parsed.success) {
+            return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+        }
 
         const { email, password } = parsed.data;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        if (!user) {
+            return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        }
 
         const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        if (!ok) {
+            return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        }
 
+        // ⬇️ cookies() est asynchrone en Next 15
         const store = await cookies();
-        const session = await getIronSession<SessionData>(store, sessionOptions);
-        if (!sessionOptions.password || sessionOptions.password.length < 32) {
+
+        const rawPwd: unknown = (sessionOptions as any).password;
+        const pwd =
+            Array.isArray(rawPwd) ? String(rawPwd[0] ?? "") :
+                typeof rawPwd === "string" ? rawPwd :
+                    String(rawPwd ?? "");
+
+        if (!pwd || pwd.length < 32) {
             return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
         }
+
+        const session = await getIronSession<SessionData>(store, {
+            ...sessionOptions,
+            password: pwd,
+        });
 
         session.userId = user.id;
         session.email = user.email;

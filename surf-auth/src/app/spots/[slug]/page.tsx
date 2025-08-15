@@ -1,4 +1,4 @@
-import { findBySlug, spotSlug } from "@/app/datas/spots";
+import { findBySlug } from "@/app/datas/spots";
 import { notFound } from "next/navigation";
 import WeeklyForecast from "./WeeklyForecast";
 
@@ -120,8 +120,11 @@ function summarizeWeek(data: Marine | null): DaySummary[] {
     return days;
 }
 
-export default async function Page({ params }: { params: { slug: string; }; }) {
-    const spot = findBySlug(params.slug);
+export default async function Page(
+    { params }: { params: Promise<{ slug: string; }>; }
+) {
+    const { slug } = await params;            // <- on attend params
+    const spot = findBySlug(slug);
     if (!spot) notFound();
 
     const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${spot.lat}&longitude=${spot.lon}&hourly=wave_height,wave_direction,wave_period,wind_wave_peak_period&timezone=auto`;
