@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spot, spots, spotSlug } from "./datas/spots";
 
@@ -21,8 +21,23 @@ type Marine = {
   };
 };
 
-type Lang = "fr" | "en";
+
 type Theme = "dark" | "light";
+
+const [theme, setTheme] = useState<Theme>(() => {
+  if (typeof window === "undefined") return "dark";
+  const saved = localStorage.getItem("theme");
+  if (saved === "dark" || saved === "light") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+});
+
+useLayoutEffect(() => {
+  localStorage.setItem("theme", theme);
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}, [theme]);
+
+
+type Lang = "fr" | "en";
 
 const I18N: Record<Lang, Record<string, string>> = {
   fr: {

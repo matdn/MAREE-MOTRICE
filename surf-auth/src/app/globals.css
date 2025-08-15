@@ -3,6 +3,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+  background-color: #000;
+  color: #fff;
+}
+
+html:not(.dark) {
+  color-scheme: light;
+  background-color: #fff;
+  color: #000;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
