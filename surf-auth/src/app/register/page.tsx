@@ -1,4 +1,6 @@
 import { RegisterForm } from "../components/RegisterForm";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export default function Page() {
     return (
         <main className="relative min-h-dvh overflow-hidden bg-black text-white">

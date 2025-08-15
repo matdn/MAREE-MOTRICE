@@ -6,7 +6,8 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { SessionData, sessionOptions } from "../../../../../lib/session";
 import { prisma } from "../../../../../lib/prisma";
-
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 const Schema = z.object({
     email: z.string().email(),
     password: z.string().min(6),

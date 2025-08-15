@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { SessionData, sessionOptions } from "../../../../../lib/session";
-
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export async function GET() {
     try {
         const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
