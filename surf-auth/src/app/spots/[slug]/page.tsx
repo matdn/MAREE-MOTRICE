@@ -1,6 +1,8 @@
 import { findBySlug } from "@/app/datas/spots";
 import { notFound } from "next/navigation";
 import WeeklyForecast from "./WeeklyForecast";
+import Chart24hBars from "@/app/components/Chart24hBars";
+import TideChart from "@/app/components/TideChart";
 
 type Marine = {
     hourly?: {
@@ -17,6 +19,16 @@ type Marine = {
         wind_wave_peak_period?: string;
     };
 };
+
+type TideBlock = { time: string[]; tide_height: number[]; };
+type MarineHourly = {
+    time: string[];
+    wave_height?: number[];
+    wave_direction?: number[];
+    wave_period?: number[];
+    wind_wave_peak_period?: number[];
+};
+type MarineResponse = { hourly: MarineHourly; tide?: TideBlock; };
 
 function compass(d?: number) {
     if (d == null || Number.isNaN(d)) return "-";
@@ -123,7 +135,7 @@ function summarizeWeek(data: Marine | null): DaySummary[] {
 export default async function Page(
     { params }: { params: Promise<{ slug: string; }>; }
 ) {
-    const { slug } = await params;            // <- on attend params
+    const { slug } = await params;
     const spot = findBySlug(slug);
     if (!spot) notFound();
 
@@ -156,6 +168,8 @@ export default async function Page(
                 <div className="grain-bg absolute -inset-[100%] mix-blend-soft-light animate-[var(--animate-grain)]" />
             </div>
 
+
+
             <section className="relative z-10 mx-auto max-w-5xl px-6 py-10">
                 {/* Titre & meta */}
                 <div className="flex items-center justify-between">
@@ -166,134 +180,45 @@ export default async function Page(
                     <a href="/" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15">Retour</a>
                 </div>
 
-                <div className="mt-6 grid gap-6 md:grid-cols-4">
+                <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    {(() => {
+                        const t = (data as MarineResponse)?.tide;
+                        const { times, values } = t?.time?.length
+                            ? sliceNextHours(t.time, t.tide_height, 0, 24)
+                            : { times: [], values: [] };
+                        return values.length ? (
+                            <TideChart times={times} values={values} unit="m" />
+                        ) : (
+                            <div className="h-40 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+                                Données insuffisantes pour tracer le graphique.
+                            </div>
+                        );
+                    })()}
+                </div>
+
+                <div className="mt-6 grid gap-6 md:grid-cols-1">
                     {/* NOW */}
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl md:col-span-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-medium">Maintenant</h2>
-                            <span className="text-xs text-white/60">{when}</span>
-                        </div>
-                        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                                <div className="text-xs uppercase tracking-wider text-white/60">Hauteur</div>
-                                <div className="mt-1 text-2xl font-semibold">{wh != null ? `${wh.toFixed(2)} ${units.wh}` : "—"}</div>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                                <div className="text-xs uppercase tracking-wider text-white/60">Période</div>
-                                <div className="mt-1 text-2xl font-semibold">{wp != null ? `${Math.round(wp)} ${units.wp}` : "—"}</div>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                                <div className="text-xs uppercase tracking-wider text-white/60">Direction</div>
-                                <div className="mt-1 text-2xl font-semibold">{wd != null ? `${Math.round(wd)}° ${compass(wd)}` : "—"}</div>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                                <div className="text-xs uppercase tracking-wider text-white/60">Pic vagues de vent</div>
-                                <div className="mt-1 text-2xl font-semibold">{wpp != null ? `${Math.round(wpp)} ${units.wpp}` : "—"}</div>
-                            </div>
-                        </div>
+                    {/* Graphique vertical (bar chart) */}
 
-                        {/* Placeholder chart area */}
-                        {/* Sparkline – Hauteur de houle (24h) – responsive */}
-                        <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
-                            {(() => {
-                                const idx = data?.hourly?.time?.length ? nearestIdx(data.hourly.time) : -1;
-                                const { times, values } =
-                                    idx >= 0 && data?.hourly?.wave_height
-                                        ? sliceNextHours(data.hourly.time, data.hourly.wave_height, idx, 24)
-                                        : { times: [], values: [] };
 
-                                // ViewBox: s’adapte à la largeur via width="100%" + preserveAspectRatio
-                                const VBW = 1000;
-                                const VBH = 180;
-                                const { d, min, max, avg, pts, lo, hi } = buildSparkPathResponsive(values, VBW, VBH, 10);
+                    <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+                        {(() => {
+                            const idx = data?.hourly?.time?.length ? nearestIdx(data.hourly.time) : -1;
+                            const { times, values } =
+                                idx >= 0 && data?.hourly?.wave_height
+                                    ? sliceNextHours(data.hourly.time, data.hourly.wave_height, idx, 24)
+                                    : { times: [], values: [] };
 
-                                // repères verticales toutes les 6h
-                                const gridIdx: number[] = [];
-                                for (let i = 0; i < times.length; i += 6) gridIdx.push(i);
-
-                                const ny = (v: number) => {
-                                    if (hi === lo) return VBH / 2;
-                                    const t = (v - lo) / (hi - lo);
-                                    return (1 - t) * (VBH - 20) + 10;
-                                };
-                                const yAvg = ny(avg);
-
-                                return values.length ? (
-                                    <div className="relative">
-                                        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                                            <div>
-                                                <div className="text-sm font-medium">Hauteur de houle — 24h</div>
-                                                <div className="text-xs text-white/60">
-                                                    min {min.toFixed(1)} {units.wh} • moy {avg.toFixed(1)} {units.wh} • max {max.toFixed(1)} {units.wh}
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-white/60">
-                                                {new Date(times[0]).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} —{" "}
-                                                {new Date(times[times.length - 1]).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                            </div>
-                                        </div>
-
-                                        {/* SVG fluide : largeur 100%, hauteur responsive via classes Tailwind */}
-                                        <div className="w-full">
-                                            <svg
-                                                viewBox={`0 0 ${VBW} ${VBH}`}
-                                                width="100%"
-                                                height="100%"
-                                                preserveAspectRatio="none"
-                                                className="block h-44 sm:h-56"
-                                            >
-                                                <defs>
-                                                    <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="white" stopOpacity="1" />
-                                                        <stop offset="100%" stopColor="white" stopOpacity="0.3" />
-                                                    </linearGradient>
-                                                    <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="0%" stopColor="white" stopOpacity="0.20" />
-                                                        <stop offset="100%" stopColor="white" stopOpacity="0.03" />
-                                                    </linearGradient>
-                                                </defs>
-
-                                                {/* fond */}
-                                                <rect x="0" y="0" width={VBW} height={VBH} fill="url(#fillGrad)" rx="12" />
-
-                                                {/* grille verticale (toutes les 6h) */}
-                                                {gridIdx.map((i) => {
-                                                    const x = pts.length === 1 ? VBW / 2 : (i / (pts.length - 1)) * (VBW - 20) + 10;
-                                                    return <line key={i} x1={x} y1={8} x2={x} y2={VBH - 8} stroke="currentColor" opacity="0.12" />;
-                                                })}
-
-                                                {/* ligne moyenne */}
-                                                {values.length > 1 && <line x1={10} x2={VBW - 10} y1={yAvg} y2={yAvg} stroke="currentColor" opacity="0.2" strokeDasharray="4 4" />}
-
-                                                {/* courbe */}
-                                                <path d={d} fill="none" stroke="url(#lineGrad)" strokeWidth={22} strokeLinejoin="round" strokeLinecap="round" />
-
-                                                {/* points min / max */}
-                                                {values.length > 1 && (() => {
-                                                    const minIdx = values.indexOf(min);
-                                                    const maxIdx = values.indexOf(max);
-                                                    const pMin = pts[minIdx];
-                                                    const pMax = pts[maxIdx];
-                                                    return (
-                                                        <>
-                                                            <circle cx={pMin.x} cy={pMin.y} r={16} fill="white" opacity="0.08" />
-                                                            <circle cx={pMin.x} cy={pMin.y} r={4} fill="white" opacity="0.7" />
-                                                            <circle cx={pMax.x} cy={pMax.y} r={16} fill="white" opacity="0.12" />
-                                                            <circle cx={pMax.x} cy={pMax.y} r={4} fill="white" />
-                                                        </>
-                                                    );
-                                                })()}
-                                            </svg>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-40 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
-                                        Données insuffisantes pour tracer le graphique.
-                                    </div>
-                                );
-                            })()}
-                        </div>
+                            return values.length ? (
+                                <Chart24hBars times={times} values={values} unit={units.wh} />
+                            ) : (
+                                <div className="h-40 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+                                    Données insuffisantes pour tracer le graphique.
+                                </div>
+                            );
+                        })()}
                     </div>
+
 
                     {/* META */}
                     {/* <aside className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
